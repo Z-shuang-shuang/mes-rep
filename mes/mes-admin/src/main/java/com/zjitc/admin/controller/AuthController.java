@@ -38,7 +38,7 @@ public class AuthController {
         return Result.success(loginResponse);
     }
 
-    // 示例：需要获取当前登录用户ID的接口
+    // 需要获取当前登录用户ID的接口
     @GetMapping("/current-user")
     public Result<String> getCurrentUser() {
         String userId = UserContext.getUserId();
