@@ -54,7 +54,14 @@ public class JwtUtil {
      * @return
      */
     public Claims parseToken(String token){
-        return Jwts.parser().parseClaimsJws(token).getBody();
+        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
+
+        // 【唯一修改点】将错误的 Jwts.SetSignKey 替换为标准的 parserBuilder 链式调用
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 
 
