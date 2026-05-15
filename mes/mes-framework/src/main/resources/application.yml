@@ -1,0 +1,9 @@
+# application.yml
+spring:
+  data:
+    redis:
+      host: localhost
+      password:
+      database: 0
+      timeout: 5000ms
+      port: 6379

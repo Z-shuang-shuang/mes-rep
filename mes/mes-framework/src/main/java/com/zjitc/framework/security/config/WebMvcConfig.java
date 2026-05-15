@@ -1,4 +1,4 @@
-package com.zjitc.framework.config; // 建议放在 config 包下
+package com.zjitc.framework.security.config; // 建议放在 config 包下
 
 import com.zjitc.framework.security.jwt.JwtInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 // 2. 指定放行的路径：登录、注册、静态资源等不需要 Token 的接口
                 .excludePathPatterns(
                         "/api/**/login",      // 登录接口
-                        "/api/**/register",   // 注册接口
+                        "/api/**/register"  // 注册接口
                                               // 如果有 swagger/knife4j 文档
                                               // 静态资源
                                               // 图标

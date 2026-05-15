@@ -102,6 +102,29 @@ public class JwtUtil {
         return parseToken(token).getExpiration().before(new Date());
     }
 
+    // 在 JwtUtil 类中添加以下方法：
+
+    /**
+     * 获取token的剩余有效期（毫秒）
+     */
+    public long getRemainingExpiration(String token) {
+        try {
+            Claims claims = parseToken(token);
+            Date expiration = claims.getExpiration();
+            Date now = new Date();
+            long remaining = expiration.getTime() - now.getTime();
+            return Math.max(0, remaining);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 获取token的过期时间
+     */
+    public Date getExpirationDate(String token) {
+        return parseToken(token).getExpiration();
+    }
 
 
 

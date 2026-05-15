@@ -10,6 +10,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+// 修改后的 JwtInterceptor.java
 
 @Component
 public class JwtInterceptor implements HandlerInterceptor {
@@ -20,44 +21,66 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    private TokenBlacklistService blacklistService;
+
+    @Autowired
+    private UserTokenService userTokenService;
+
     @Override
-    public boolean preHandle(jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(jakarta.servlet.http.HttpServletRequest request,
+                             jakarta.servlet.http.HttpServletResponse response,
+                             Object handler) throws Exception {
 
         String method = request.getMethod();
-        if (method.equals("OPTIONS")) {//跨域预检请求，放行
+        if (method.equals("OPTIONS")) {
             return true;
         }
-        //1、从请求头中拿token
+
+        // 白名单路径（不需要认证的接口）
+        String path = request.getRequestURI();
+        if (path.contains("/login") || path.contains("/logout")) {
+            return true;
+        }
 
         String authorization = request.getHeader("Authorization");
-        if (authorization == null || !authorization.startsWith("Bearer ")) {//Bearer eeeerrttt4545566667777785444443333333
-            //给前端响应
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
             writeUnauthorized(response, "认证失败");
-            //拦截下来，不放行
-             return false;
+            return false;
         }
+
         try {
             String token = authorization.substring(7);
-            boolean exp = jwtUtil.isExp(token);
-            if (exp) {
-                //给前端响应
-                writeUnauthorized(response, "认证失败");
-                //拦截下来，不放行
+
+            // 1. 检查token是否在黑名单中
+            if (blacklistService.isBlacklisted(token)) {
+                writeUnauthorized(response, "token已失效，请重新登录");
                 return false;
             }
-            //2、解析token，拿出userid
-            String userId = jwtUtil.getUserId(token);//隐藏的有对token的解析
-            //3、设置userid，方便后续拿到userid,有以下两种方式：
-            //3.1 方式一：放在reqest
+
+            // 2. 检查token是否过期
+            boolean exp = jwtUtil.isExp(token);
+            if (exp) {
+                writeUnauthorized(response, "token已过期，请重新登录");
+                return false;
+            }
+
+            // 3. 解析token，获取userId
+            String userId = jwtUtil.getUserId(token);
+
+            // 4. 检查该token是否是用户当前有效的token
+            if (!userTokenService.isTokenValid(userId, token)) {
+                writeUnauthorized(response, "账号已在其他地方登录，请重新登录");
+                return false;
+            }
+
+            // 5. 设置用户信息到上下文
             request.setAttribute("userId", userId);
-            //3.2 方式二：放在ThreadLocal（当前请求的线程的上下文）
-            //todo:
-            UserContext.setUserId(userId);  // 设置到 ThreadLocal
-            return  true;
-        }catch (Exception e){
-            //给前端响应
+            UserContext.setUserId(userId);
+
+            return true;
+        } catch (Exception e) {
             writeUnauthorized(response, "认证失败");
-            //拦截下来，不放行
             return false;
         }
     }
@@ -66,12 +89,14 @@ public class JwtInterceptor implements HandlerInterceptor {
     public void afterCompletion(jakarta.servlet.http.HttpServletRequest request,
                                 jakarta.servlet.http.HttpServletResponse response,
                                 Object handler, Exception ex) throws Exception {
-        UserContext.remove();  // 清理 ThreadLocal
+        UserContext.remove();
     }
 
-    private void writeUnauthorized( HttpServletResponse response, String msg) throws IOException {
-        Result<String> result = Result.fail(401, msg);//构造出来失败的结果对象
-        String res = objectMapper.writeValueAsString(result);//把对象转json字符串
-        response.getWriter().write(res);//把json字符串返回给前端
+    private void writeUnauthorized(HttpServletResponse response, String msg) throws IOException {
+        Result<String> result = Result.fail(401, msg);
+        String res = objectMapper.writeValueAsString(result);
+        response.setContentType("application/json;charset=UTF-8");
+        response.setStatus(401);
+        response.getWriter().write(res);
     }
 }
