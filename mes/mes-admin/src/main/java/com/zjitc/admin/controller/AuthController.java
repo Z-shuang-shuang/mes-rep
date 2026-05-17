@@ -11,7 +11,6 @@ import com.zjitc.framework.security.jwt.UserTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-@CrossOrigin
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
