@@ -9,7 +9,10 @@ import com.zjitc.framework.security.context.UserContext;
 import com.zjitc.framework.security.jwt.JwtUtil;
 import com.zjitc.framework.security.jwt.UserTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -20,6 +23,9 @@ public class AuthController {
 
     @Autowired
     private UserTokenService userTokenService;
+
+    @Autowired
+    RedisTemplate redisTemplate;
 
     @PostMapping("/login")
     public Result<LoginResponse> login(@RequestBody UserRequest userRequest) {
@@ -32,9 +38,12 @@ public class AuthController {
 
         // 生成新token
         String token = jwtUtil.generateToken(userId, username);
+        String tokenid= UUID.randomUUID().toString();
+
+        redisTemplate.opsForValue().set(tokenid,token);
 
         // 【关键】注册新token，使旧token失效
-        userTokenService.registerNewToken(userId, token);
+//        userTokenService.registerNewToken(userId, token);
 
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUsername(username);
@@ -51,7 +60,6 @@ public class AuthController {
             userTokenService.logout(userId);
             UserContext.remove();
         }
-        System.out.printf("退出登录成功");
         return Result.success("退出登录成功");
     }
 

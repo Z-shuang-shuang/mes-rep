@@ -23,20 +23,20 @@ public class UserTokenService {
      */
     public void registerNewToken(String userId, String newToken) {
         // 获取用户旧的token
-        String oldToken = userCurrentToken.get(userId);
-
-        if (oldToken != null && !oldToken.equals(newToken)) {
-            // 计算旧token的剩余有效期
-            try {
-                long remainingExpiration = jwtUtil.getRemainingExpiration(oldToken);
-                if (remainingExpiration > 0) {
-                    // 将旧token加入黑名单
-                    blacklistService.addToBlacklist(oldToken, remainingExpiration);
-                }
-            } catch (Exception e) {
-                // token可能已过期或无效，忽略
-            }
-        }
+//        String oldToken = userCurrentToken.get(userId);
+//
+//        if (oldToken != null && !oldToken.equals(newToken)) {
+//            // 计算旧token的剩余有效期
+//            try {
+//                long remainingExpiration = jwtUtil.getRemainingExpiration(oldToken);
+//                if (remainingExpiration > 0) {
+//                    // 将旧token加入黑名单
+//                    blacklistService.addToBlacklist(oldToken, remainingExpiration);
+//                }
+//            } catch (Exception e) {
+//                // token可能已过期或无效，忽略
+//            }
+//        }
 
         // 存储新的token
         userCurrentToken.put(userId, newToken);
@@ -46,8 +46,9 @@ public class UserTokenService {
      * 验证token是否有效（未被新token替代）
      */
     public boolean isTokenValid(String userId, String token) {
-        String currentToken = userCurrentToken.get(userId);
-        return currentToken != null && currentToken.equals(token);
+//        String currentToken = userCurrentToken.get(userId);
+//        return currentToken != null && currentToken.equals(token);
+        return true;
     }
 
     /**
