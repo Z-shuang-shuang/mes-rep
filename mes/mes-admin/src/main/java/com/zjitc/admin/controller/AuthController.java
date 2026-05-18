@@ -51,6 +51,7 @@ public class AuthController {
             userTokenService.logout(userId);
             UserContext.remove();
         }
+        System.out.printf("退出登录成功");
         return Result.success("退出登录成功");
     }
 

@@ -54,12 +54,12 @@ public class UserTokenService {
      * 用户登出时清除token记录
      */
     public void logout(String userId) {
-        String token = userCurrentToken.remove(userId);
+        String token = userCurrentToken.remove(userId);//从Map中删除用户ID与token
         if (token != null) {
             try {
-                long remainingExpiration = jwtUtil.getRemainingExpiration(token);
+                long remainingExpiration = jwtUtil.getRemainingExpiration(token);//计算token剩余有效期（毫秒
                 if (remainingExpiration > 0) {
-                    blacklistService.addToBlacklist(token, remainingExpiration);
+                    blacklistService.addToBlacklist(token, remainingExpiration);//将token加入黑名单，过期时间等于剩余有效期
                 }
             } catch (Exception e) {
                 // 忽略
