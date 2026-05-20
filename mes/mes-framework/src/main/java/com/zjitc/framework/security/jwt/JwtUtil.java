@@ -1,6 +1,5 @@
 package com.zjitc.framework.security.jwt;
 
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -11,7 +10,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -20,43 +19,33 @@ public class JwtUtil {
     private String secret = "11111111111111111111111111111111";
 
     /**
-     * 生成token
-     * @param userid
-     * @param username
-     * @return
+     * 生成token（带tokenId）
      */
     public String generateToken(String userid, String username){
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + expiration);
 
-        Date now = new Date();//现在时间
-        Date expiryDate = new Date(now.getTime() + expiration);//过期时间
+        // 生成唯一的tokenId
+        String tokenId = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
 
-        //token的载荷
-        Map<String,Object> map = new HashMap<>();
-//        map.put("userid",userid);
-        map.put("username",username);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", username);
+        claims.put("tokenId", tokenId);  // 添加tokenId到payload
 
-        //token签名的秘钥
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
 
-        String token = Jwts.builder()
-                .setSubject(userid)//载荷的sub键
-                .addClaims(map)
+        return Jwts.builder()
+                .setSubject(userid)
+                .addClaims(claims)
+                .setId(tokenId)  // 也可以设置JWT ID
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(key,  SignatureAlgorithm.HS256)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
-        return token;
     }
 
-    /**
-     * 从token中解析出Claims
-     * @param token
-     * @return
-     */
     public Claims parseToken(String token){
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
-
-        // 【唯一修改点】将错误的 Jwts.SetSignKey 替换为标准的 parserBuilder 链式调用
         return Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
@@ -64,49 +53,44 @@ public class JwtUtil {
                 .getBody();
     }
 
-
-    /**
-     * 从Claims中取出userid
-     * @param token
-     * @return
-     */
     public String getUserId(String token){
         return parseToken(token).getSubject();
     }
 
-    /**
-     * 从CLaims中取出username
-     * @param token
-     * @return
-     */
     public String getUsername(String token){
         return parseToken(token).get("username", String.class);
     }
 
     /**
-     * 取出其他存在Claims中的键值对（按照键来取值）
-     * @param token
-     * @param name
-     * @return
+     * 从token中获取tokenId
      */
+    public String getTokenIdFromToken(String token){
+        try {
+            Claims claims = parseToken(token);
+            System.out.println("Claims内容: " + claims);
+
+            String tokenId = claims.get("tokenId", String.class);
+            System.out.println("从claims获取tokenId: " + tokenId);
+
+            if (tokenId == null || tokenId.isEmpty()) {
+                tokenId = claims.getId();
+                System.out.println("从claims.getId获取tokenId: " + tokenId);
+            }
+            return tokenId;
+        } catch (Exception e) {
+            System.out.println("解析tokenId失败: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
     public String getData(String token, String name){
         return parseToken(token).get(name, String.class);
     }
 
-    /**
-     * 判断token是否过期
-     * @param token
-     * @return
-     */
     public boolean isExp(String token){
         return parseToken(token).getExpiration().before(new Date());
     }
 
-    // 在 JwtUtil 类中添加以下方法：
-
-    /**
-     * 获取token的剩余有效期（毫秒）
-     */
     public long getRemainingExpiration(String token) {
         try {
             Claims claims = parseToken(token);
@@ -119,13 +103,7 @@ public class JwtUtil {
         }
     }
 
-    /**
-     * 获取token的过期时间
-     */
     public Date getExpirationDate(String token) {
         return parseToken(token).getExpiration();
     }
-
-
-
 }
