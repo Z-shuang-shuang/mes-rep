@@ -4,13 +4,13 @@ import com.zjitc.admin.dto.request.UserRequest;
 import com.zjitc.admin.dto.response.LoginResponse;
 import com.zjitc.common.result.Result;
 import com.zjitc.framework.security.context.UserContext;
-import com.zjitc.framework.security.jwt.JwtUtil;
-import com.zjitc.framework.security.jwt.RequirePermission;
-import com.zjitc.framework.security.jwt.RequireRole;
-import com.zjitc.framework.security.jwt.TokenManageService;
+import com.zjitc.framework.security.entity.SysUser;
+import com.zjitc.framework.security.jwt.*;
+import com.zjitc.framework.security.service.TokenManageService;
+import com.zjitc.framework.security.service.UserAuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.*;
 
 @CrossOrigin
@@ -24,46 +24,73 @@ public class AuthController {
     @Autowired
     private TokenManageService tokenManageService;
 
+    @Autowired
+    private UserAuthService userAuthService;
+
+    /**
+     * 登录接口 - 从数据库查询用户信息
+     */
     @PostMapping("/login")
-    public Result<LoginResponse> login(@RequestBody UserRequest userRequest) {
+    public Result<LoginResponse> login(@RequestBody UserRequest userRequest, HttpServletRequest request) {
         String username = userRequest.getUsername();
         String password = userRequest.getPassword();
 
-        // TODO: 实际应该从数据库查询用户信息和权限
-        String userId = "1000";
-        List<String> roles = Arrays.asList("admin", "user");
-        List<String> permissions = Arrays.asList("user:read", "user:write", "user:delete", "token:manage");
+        // 1. 从数据库查询用户
+        SysUser user = userAuthService.findByUsername(username);
+        if (user == null) {
+            return Result.fail(401, "用户名不存在");
+        }
 
-        // 生成token（带角色和权限）
-        String token = jwtUtil.generateToken(userId, username, roles, permissions);
-        String tokenId = jwtUtil.getTokenIdFromToken(token);
+        // 2. 验证密码
+        if (!userAuthService.verifyPassword(password, user.getPassword())) {
+            return Result.fail(401, "密码错误");
+        }
 
-        // 存储到Redis（使用新的管理服务）
-        tokenManageService.storeToken(userId, tokenId, token, 24);
+        // 3. 检查用户状态
+        if (user.getStatus() != 1) {
+            return Result.fail(403, "账号已被禁用，请联系管理员");
+        }
 
+        // 4. 从数据库查询角色和权限
+        List<String> roles = userAuthService.getUserRoles(user.getId());
+        List<String> permissions = userAuthService.getUserPermissions(user.getId());
+
+        // 5. 构建 LoginUser 对象
+        LoginUser loginUser = new LoginUser();
+        loginUser.setUserId(user.getId());
+        loginUser.setUsername(username);
+        loginUser.setRoles(roles);
+        loginUser.setPermissions(permissions);
+        loginUser.setLoginTime(System.currentTimeMillis());
+        loginUser.setTokenId(UUID.randomUUID().toString().replace("-", ""));
+        loginUser.setIpAddress(getClientIp(request));
+        loginUser.setDeviceInfo(request.getHeader("User-Agent"));
+
+        // 6. 生成 token
+        String token = jwtUtil.generateToken(loginUser);
+        loginUser.setToken(token);
+
+        // 7. 存储到 Redis
+        tokenManageService.storeLoginUser(loginUser, 24);
+
+        // 8. 返回响应（使用你现有的 LoginResponse）
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUsername(username);
         loginResponse.setToken(token);
-        loginResponse.setUserid(userId);
+        loginResponse.setUserid(user.getId());
 
         return Result.success(loginResponse);
     }
 
+    /**
+     * 退出登录
+     */
     @PostMapping("/logout")
     public Result<String> logout() {
-        String userId = UserContext.getUserId();
-        String token = UserContext.getToken();
+        LoginUser loginUser = UserContext.getLoginUser();
 
-        if (userId != null && token != null) {
-            try {
-                String tokenId = jwtUtil.getTokenIdFromToken(token);
-                if (tokenId != null) {
-                    // 只删除当前设备的token
-                    tokenManageService.deleteToken(userId, tokenId);
-                }
-            } catch (Exception e) {
-                // 忽略解析错误
-            }
+        if (loginUser != null) {
+            tokenManageService.deleteToken(loginUser.getUserId(), loginUser.getTokenId());
             UserContext.remove();
         }
         return Result.success("退出登录成功");
@@ -71,14 +98,13 @@ public class AuthController {
 
     /**
      * 踢用户下线 - 需要管理员权限
-     * @RequirePermission 注解表示只有拥有 user:delete 权限的用户才能访问
      */
     @DeleteMapping("/kick/{userId}")
     @RequirePermission("user:delete")
     public Result<String> kickUser(@PathVariable String userId) {
-        // 获取当前用户ID，防止踢自己
-        String currentUserId = UserContext.getUserId();
-        if (currentUserId.equals(userId)) {
+        LoginUser currentUser = UserContext.getLoginUser();
+
+        if (currentUser.getUserId().equals(userId)) {
             return Result.fail(400, "不能踢自己");
         }
 
@@ -101,18 +127,10 @@ public class AuthController {
      */
     @DeleteMapping("/kick-self")
     public Result<String> kickSelf() {
-        String userId = UserContext.getUserId();
-        String token = UserContext.getToken();
+        LoginUser loginUser = UserContext.getLoginUser();
 
-        if (userId != null && token != null) {
-            try {
-                String tokenId = jwtUtil.getTokenIdFromToken(token);
-                if (tokenId != null) {
-                    tokenManageService.deleteToken(userId, tokenId);
-                }
-            } catch (Exception e) {
-                System.out.println("强制下线失败: " + e.getMessage());
-            }
+        if (loginUser != null) {
+            tokenManageService.deleteToken(loginUser.getUserId(), loginUser.getTokenId());
             UserContext.remove();
         }
 
@@ -120,22 +138,21 @@ public class AuthController {
     }
 
     /**
-     * 获取当前用户信息 - 需要登录
+     * 获取当前用户信息
      */
     @GetMapping("/current-user")
     public Result<Map<String, Object>> getCurrentUser() {
-        String userId = UserContext.getUserId();
-        String token = UserContext.getToken();
+        LoginUser loginUser = UserContext.getLoginUser();
 
-        if (userId == null) {
+        if (loginUser == null) {
             return Result.fail(401, "未登录");
         }
 
         Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("userId", userId);
-        userInfo.put("username", jwtUtil.getUsername(token));
-        userInfo.put("roles", jwtUtil.getRoles(token));
-        userInfo.put("permissions", jwtUtil.getPermissions(token));
+        userInfo.put("userId", loginUser.getUserId());
+        userInfo.put("username", loginUser.getUsername());
+        userInfo.put("roles", loginUser.getRoles());
+        userInfo.put("permissions", loginUser.getPermissions());
 
         return Result.success(userInfo);
     }
@@ -151,20 +168,24 @@ public class AuthController {
     }
 
     /**
-     * 获取用户的所有在线设备 - 用户可以查看自己的设备
+     * 获取用户的所有在线设备
      */
     @GetMapping("/my-devices")
     public Result<Map<String, Object>> getMyDevices() {
-        String userId = UserContext.getUserId();
+        LoginUser loginUser = UserContext.getLoginUser();
 
-        Set<Object> tokenIds = tokenManageService.getUserTokenIds(userId);
+        Set<Object> tokenIds = tokenManageService.getUserTokenIds(loginUser.getUserId());
         List<Map<String, Object>> devices = new ArrayList<>();
 
         for (Object tokenIdObj : tokenIds) {
             String tokenId = tokenIdObj.toString();
             Map<String, Object> device = new HashMap<>();
             device.put("tokenId", tokenId);
-            device.put("remainingTTL", tokenManageService.getTokenRemainingTTL(userId, tokenId));
+            device.put("remainingTTL", tokenManageService.getTokenRemainingTTL(loginUser.getUserId(), tokenId));
+
+            if (tokenId.equals(loginUser.getTokenId())) {
+                device.put("isCurrent", true);
+            }
             devices.add(device);
         }
 
@@ -180,15 +201,38 @@ public class AuthController {
      */
     @DeleteMapping("/delete-device/{tokenId}")
     public Result<String> deleteDevice(@PathVariable String tokenId) {
-        String userId = UserContext.getUserId();
+        LoginUser loginUser = UserContext.getLoginUser();
 
-        // 验证tokenId是否属于当前用户
-        Set<Object> userTokenIds = tokenManageService.getUserTokenIds(userId);
+        if (tokenId.equals(loginUser.getTokenId())) {
+            return Result.fail(400, "不能删除当前登录的设备");
+        }
+
+        Set<Object> userTokenIds = tokenManageService.getUserTokenIds(loginUser.getUserId());
         if (userTokenIds.contains(tokenId)) {
-            tokenManageService.deleteToken(userId, tokenId);
+            tokenManageService.deleteToken(loginUser.getUserId(), tokenId);
             return Result.success("设备已下线");
         }
 
         return Result.fail(400, "设备不存在或不属于当前用户");
+    }
+
+    /**
+     * 获取客户端IP
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

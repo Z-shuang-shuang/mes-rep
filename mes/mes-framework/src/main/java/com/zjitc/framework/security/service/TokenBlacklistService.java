@@ -1,4 +1,4 @@
-package com.zjitc.framework.security.jwt;
+package com.zjitc.framework.security.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;

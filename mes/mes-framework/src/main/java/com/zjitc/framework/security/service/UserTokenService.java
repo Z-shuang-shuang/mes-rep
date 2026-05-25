@@ -1,5 +1,6 @@
-package com.zjitc.framework.security.jwt;
+package com.zjitc.framework.security.service;
 
+import com.zjitc.framework.security.jwt.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.util.concurrent.ConcurrentHashMap;

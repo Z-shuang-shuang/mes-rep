@@ -1,10 +1,10 @@
 package com.zjitc.framework.security.jwt;
 
 import com.zjitc.framework.security.context.UserContext;
+import com.zjitc.framework.security.service.TokenManageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -14,9 +14,6 @@ public class JwtInterceptor implements HandlerInterceptor {
 
     @Autowired
     private JwtUtil jwtUtil;
-
-    @Autowired
-    private TokenBlacklistService blacklistService;
 
     @Autowired
     private TokenManageService tokenManageService;
@@ -29,7 +26,7 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
 
         String path = request.getRequestURI();
-        if (path.contains("/login")) {
+        if (path.contains("/login") || path.contains("/register")) {
             return true;
         }
 
@@ -42,37 +39,42 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         try {
             String token = authorization.substring(7);
-            request.setAttribute("token", token); // 保存token供后续使用
+            request.setAttribute("token", token);
 
-            // 1. 检查token是否在黑名单中
-            if (blacklistService.isBlacklisted(token)) {
-                writeUnauthorized(response, "token已失效，请重新登录");
-                return false;
-            }
-
-            // 2. 检查token是否过期
+            // 1. 检查 token 是否过期
             if (jwtUtil.isExp(token)) {
                 writeUnauthorized(response, "token已过期，请重新登录");
                 return false;
             }
 
-            // 3. 解析token，获取userId和tokenId
+            // 2. 解析 token 获取 userId 和 tokenId
             String userId = jwtUtil.getUserId(token);
             String tokenId = jwtUtil.getTokenIdFromToken(token);
 
-            // 4. 从Redis验证token是否存在
+            // 3. 从 Redis 验证 token 是否存在
             if (!tokenManageService.validateToken(userId, tokenId)) {
                 writeUnauthorized(response, "token已失效，请重新登录");
                 return false;
             }
 
-            // 5. 设置用户信息到上下文
-            UserContext.setUserId(userId);
-            UserContext.setToken(token);
+            // 4. 获取 LoginUser 并存储到上下文
+            LoginUser loginUser = tokenManageService.getLoginUser(userId, tokenId);
+            if (loginUser == null) {
+                // 降级方案：从 token 解析
+                loginUser = jwtUtil.parseTokenToLoginUser(token);
+            }
+
+            if (loginUser != null) {
+                loginUser.setToken(token);
+                UserContext.setLoginUser(loginUser);
+            } else {
+                UserContext.setUserId(userId);
+                UserContext.setToken(token);
+            }
 
             return true;
         } catch (Exception e) {
-            writeUnauthorized(response, "认证失败");
+            writeUnauthorized(response, "认证失败: " + e.getMessage());
             return false;
         }
     }

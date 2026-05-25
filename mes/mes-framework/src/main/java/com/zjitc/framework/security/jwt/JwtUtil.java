@@ -5,48 +5,35 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
-
 import javax.crypto.SecretKey;
 import java.util.*;
 
-/**
- * JWT工具类 - 负责token的生成、解析和验证
- * 作用：提供完整的JWT操作功能，包括生成带唯一ID的token、解析token、验证过期时间等
- * @author admin
- */
 @Component
 public class JwtUtil {
 
-    private long expiration = 24 * 60 * 60 * 1000; // token有效期24小时
-    private String secret = "11111111111111111111111111111111"; // 签名密钥
+    private long expiration = 24 * 60 * 60 * 1000;
+    private String secret = "11111111111111111111111111111111";
 
     /**
-     * 生成token（带tokenId和权限信息）
-     * @param userid 用户ID
-     * @param username 用户名
-     * @param roles 用户角色列表
-     * @param permissions 用户权限列表
+     * 从 LoginUser 生成 token
      */
-    public String generateToken(String userid, String username, List<String> roles, List<String> permissions){
+    public String generateToken(LoginUser loginUser) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
-        // 生成唯一的tokenId
-        String tokenId = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
-
         Map<String, Object> claims = new HashMap<>();
-        claims.put("username", username);
-        claims.put("tokenId", tokenId);
-        claims.put("roles", roles);      // 添加角色信息
-        claims.put("permissions", permissions); // 添加权限信息
-        claims.put("loginTime", now.getTime()); // 登录时间
+        claims.put("username", loginUser.getUsername());
+        claims.put("tokenId", loginUser.getTokenId());
+        claims.put("roles", loginUser.getRoles());
+        claims.put("permissions", loginUser.getPermissions());
+        claims.put("loginTime", loginUser.getLoginTime());
 
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
 
         return Jwts.builder()
-                .setSubject(userid)
+                .setSubject(loginUser.getUserId())
                 .addClaims(claims)
-                .setId(tokenId)
+                .setId(loginUser.getTokenId())
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -54,13 +41,20 @@ public class JwtUtil {
     }
 
     /**
-     * 重载方法 - 兼容旧代码
+     * 兼容旧方法
      */
-    public String generateToken(String userid, String username){
-        return generateToken(userid, username, new ArrayList<>(), new ArrayList<>());
+    public String generateToken(String userId, String username, List<String> roles, List<String> permissions) {
+        LoginUser loginUser = new LoginUser();
+        loginUser.setUserId(userId);
+        loginUser.setUsername(username);
+        loginUser.setRoles(roles);
+        loginUser.setPermissions(permissions);
+        loginUser.setTokenId(UUID.randomUUID().toString().replace("-", ""));
+        loginUser.setLoginTime(System.currentTimeMillis());
+        return generateToken(loginUser);
     }
 
-    public Claims parseToken(String token){
+    public Claims parseToken(String token) {
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -69,18 +63,15 @@ public class JwtUtil {
                 .getBody();
     }
 
-    public String getUserId(String token){
+    public String getUserId(String token) {
         return parseToken(token).getSubject();
     }
 
-    public String getUsername(String token){
+    public String getUsername(String token) {
         return parseToken(token).get("username", String.class);
     }
 
-    /**
-     * 从token中获取tokenId
-     */
-    public String getTokenIdFromToken(String token){
+    public String getTokenIdFromToken(String token) {
         try {
             Claims claims = parseToken(token);
             String tokenId = claims.get("tokenId", String.class);
@@ -93,9 +84,6 @@ public class JwtUtil {
         }
     }
 
-    /**
-     * 获取用户角色列表
-     */
     @SuppressWarnings("unchecked")
     public List<String> getRoles(String token) {
         try {
@@ -106,9 +94,6 @@ public class JwtUtil {
         }
     }
 
-    /**
-     * 获取用户权限列表
-     */
     @SuppressWarnings("unchecked")
     public List<String> getPermissions(String token) {
         try {
@@ -119,10 +104,13 @@ public class JwtUtil {
         }
     }
 
-    public boolean isExp(String token){
+    public boolean isExp(String token) {
         return parseToken(token).getExpiration().before(new Date());
     }
 
+    /**
+     * 获取 token 剩余有效时间（毫秒）
+     */
     public long getRemainingExpiration(String token) {
         try {
             Claims claims = parseToken(token);
@@ -135,7 +123,41 @@ public class JwtUtil {
         }
     }
 
+    /**
+     * 获取 token 剩余有效时间（秒）
+     */
+    public long getRemainingExpirationSeconds(String token) {
+        return getRemainingExpiration(token) / 1000;
+    }
+
+    /**
+     * 获取 token 过期时间
+     */
     public Date getExpirationDate(String token) {
-        return parseToken(token).getExpiration();
+        try {
+            return parseToken(token).getExpiration();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 解析 token 为 LoginUser
+     */
+    public LoginUser parseTokenToLoginUser(String token) {
+        try {
+            Claims claims = parseToken(token);
+            LoginUser loginUser = new LoginUser();
+            loginUser.setToken(token);
+            loginUser.setUserId(claims.getSubject());
+            loginUser.setUsername(claims.get("username", String.class));
+            loginUser.setTokenId(claims.get("tokenId", String.class));
+            loginUser.setRoles(claims.get("roles", List.class));
+            loginUser.setPermissions(claims.get("permissions", List.class));
+            loginUser.setLoginTime(claims.get("loginTime", Long.class));
+            return loginUser;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

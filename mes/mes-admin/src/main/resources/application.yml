@@ -6,3 +6,8 @@ spring:
       password:
       database: 0
       timeout: 5000ms
+  datasource:
+    url: jdbc:mysql://localhost:3308/user?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
