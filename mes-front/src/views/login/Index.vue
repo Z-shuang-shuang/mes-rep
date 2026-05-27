@@ -7,14 +7,42 @@ let username = ref("")
 let password = ref("")
 let loading = ref(false)
 
-// 添加axios拦截器（统一处理token）
-axios.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// 添加axios响应拦截器（全局处理token失效）
+axios.interceptors.response.use(
+  response => {
+    // 正常响应直接返回
+    return response
+  },
+  error => {
+    // 处理错误响应
+    if (error.response) {
+      // 如果是401未授权（token过期或被踢下线）
+      if (error.response.status === 401) {
+        // 清除本地token
+        localStorage.removeItem('token')
+        // 跳转到登录页
+        router.push('/')
+        // 提示用户
+        alert('登录已过期，请重新登录')
+      }
+    }
+    return Promise.reject(error)
   }
-  return config;
-});
+)
+
+// 添加axios请求拦截器（自动添加token）
+axios.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
 
 function submit(): void {
   if (loading.value) return;
@@ -29,10 +57,10 @@ function submit(): void {
       localStorage.setItem("token", res.data.data.token)
       router.push({name: "Index"})
     } else {
-      alert(res.data.message || '登录失败')
+      alert(res.data.msg || '登录失败')
     }
   }).catch(err => {
-    alert('登录失败：' + (err.response?.data?.message || '网络错误'))
+    alert('登录失败：' + (err.response?.data?.msg || '网络错误'))
   }).finally(() => {
     loading.value = false;
   })

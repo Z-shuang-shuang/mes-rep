@@ -1,60 +1,93 @@
 package com.zjitc.framework.security.jwt;
 
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ *
+ * JJWT 版本很重要！
+ * 不同版本使用的方法不一样！
+ * 当前使用的是0.11.5版本
+ *
+ *
+ */
 
 @Component
 public class JwtUtil {
 
-    private long expiration = 24 * 60 * 60 * 1000;
+    private long expiration = 2 * 60 * 1000;
     private String secret = "11111111111111111111111111111111";
 
     /**
-     * 从 LoginUser 生成 token
+     * 生成token
+     * @param userid
+     * @param username
+     * @return
      */
-    public String generateToken(LoginUser loginUser) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expiration);
+    public String generateToken(String userid, String username){
 
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("username", loginUser.getUsername());
-        claims.put("tokenId", loginUser.getTokenId());
-        claims.put("roles", loginUser.getRoles());
-        claims.put("permissions", loginUser.getPermissions());
-        claims.put("loginTime", loginUser.getLoginTime());
+        Date now = new Date();//现在时间
+        Date expiryDate = new Date(now.getTime() + expiration);//过期时间
 
+        //token的载荷
+        Map<String,Object> map = new HashMap<>();
+//        map.put("userid",userid);
+        map.put("username",username);
+
+        //token签名的秘钥
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
 
-        return Jwts.builder()
-                .setSubject(loginUser.getUserId())
-                .addClaims(claims)
-                .setId(loginUser.getTokenId())
+        String token = Jwts.builder()
+                .setSubject(userid)//载荷的sub键
+                .addClaims(map)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(key,  SignatureAlgorithm.HS256)
                 .compact();
+        return token;
+    }
+
+    public String generateTokenByTokenId(String userid, String tokenId){
+
+        Date now = new Date();//现在时间
+        Date expiryDate = new Date(now.getTime() + expiration);//过期时间
+
+//        //token的载荷
+//        Map<String,Object> map = new HashMap<>();
+////        map.put("userid",userid);
+//        map.put("username",username);
+
+        //token签名的秘钥
+        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
+
+        String token = Jwts.builder()
+                .setId(tokenId)
+                .setSubject(userid)//载荷的sub键
+//                .addClaims(map)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(key,  SignatureAlgorithm.HS256)
+                .compact();
+        return token;
     }
 
     /**
-     * 兼容旧方法
+     * 从token中解析出Claims
+     *
+     * @param token
+     * @return
      */
-    public String generateToken(String userId, String username, List<String> roles, List<String> permissions) {
-        LoginUser loginUser = new LoginUser();
-        loginUser.setUserId(userId);
-        loginUser.setUsername(username);
-        loginUser.setRoles(roles);
-        loginUser.setPermissions(permissions);
-        loginUser.setTokenId(UUID.randomUUID().toString().replace("-", ""));
-        loginUser.setLoginTime(System.currentTimeMillis());
-        return generateToken(loginUser);
-    }
-
-    public Claims parseToken(String token) {
+    public Claims parseToken(String token){
+//        return Jwts.parser().parseClaimsJws(token).getBody();
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -63,101 +96,51 @@ public class JwtUtil {
                 .getBody();
     }
 
-    public String getUserId(String token) {
+
+    /**
+     * 从Claims中取出userid
+     * @param token
+     * @return
+     */
+    public String getUserId(String token){
         return parseToken(token).getSubject();
     }
 
-    public String getUsername(String token) {
+    public String getTokenId(String token){
+        return parseToken(token).getId();
+    }
+
+    /**
+     * 从CLaims中取出username
+     * @param token
+     * @return
+     */
+    public String getUsername(String token){
         return parseToken(token).get("username", String.class);
     }
 
-    public String getTokenIdFromToken(String token) {
-        try {
-            Claims claims = parseToken(token);
-            String tokenId = claims.get("tokenId", String.class);
-            if (tokenId == null || tokenId.isEmpty()) {
-                tokenId = claims.getId();
-            }
-            return tokenId;
-        } catch (Exception e) {
-            return null;
-        }
+    /**
+     * 取出其他存在Claims中的键值对（按照键来取值）
+     * @param token
+     * @param name
+     * @return
+     */
+    public String getData(String token, String name){
+        return parseToken(token).get(name, String.class);
     }
 
-    @SuppressWarnings("unchecked")
-    public List<String> getRoles(String token) {
-        try {
-            Claims claims = parseToken(token);
-            return claims.get("roles", List.class);
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    public List<String> getPermissions(String token) {
-        try {
-            Claims claims = parseToken(token);
-            return claims.get("permissions", List.class);
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
-    }
-
-    public boolean isExp(String token) {
+    /**
+     * 判断token是否过期
+     * @param token
+     * @return
+     */
+    public boolean isExp(String token){
         return parseToken(token).getExpiration().before(new Date());
     }
 
-    /**
-     * 获取 token 剩余有效时间（毫秒）
-     */
-    public long getRemainingExpiration(String token) {
-        try {
-            Claims claims = parseToken(token);
-            Date expiration = claims.getExpiration();
-            Date now = new Date();
-            long remaining = expiration.getTime() - now.getTime();
-            return Math.max(0, remaining);
-        } catch (Exception e) {
-            return 0;
-        }
+    public  long getExpiration(){
+        return expiration;
     }
 
-    /**
-     * 获取 token 剩余有效时间（秒）
-     */
-    public long getRemainingExpirationSeconds(String token) {
-        return getRemainingExpiration(token) / 1000;
-    }
 
-    /**
-     * 获取 token 过期时间
-     */
-    public Date getExpirationDate(String token) {
-        try {
-            return parseToken(token).getExpiration();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * 解析 token 为 LoginUser
-     */
-    public LoginUser parseTokenToLoginUser(String token) {
-        try {
-            Claims claims = parseToken(token);
-            LoginUser loginUser = new LoginUser();
-            loginUser.setToken(token);
-            loginUser.setUserId(claims.getSubject());
-            loginUser.setUsername(claims.get("username", String.class));
-            loginUser.setTokenId(claims.get("tokenId", String.class));
-            loginUser.setRoles(claims.get("roles", List.class));
-            loginUser.setPermissions(claims.get("permissions", List.class));
-            loginUser.setLoginTime(claims.get("loginTime", Long.class));
-            return loginUser;
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }

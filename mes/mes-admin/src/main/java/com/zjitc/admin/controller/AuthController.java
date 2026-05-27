@@ -2,18 +2,23 @@ package com.zjitc.admin.controller;
 
 import com.zjitc.admin.dto.request.UserRequest;
 import com.zjitc.admin.dto.response.LoginResponse;
+import com.zjitc.admin.entity.SysUser;
+import com.zjitc.admin.service.SysUserService;
 import com.zjitc.common.result.Result;
-import com.zjitc.framework.security.context.UserContext;
-import com.zjitc.framework.security.entity.SysUser;
-import com.zjitc.framework.security.jwt.*;
-import com.zjitc.framework.security.service.TokenManageService;
-import com.zjitc.framework.security.service.UserAuthService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.zjitc.framework.security.jwt.JwtUtil;
+import com.zjitc.framework.security.jwt.LoginUser;
+import com.zjitc.framework.security.jwt.TokenService;
+import com.zjitc.framework.security.jwt.UserContextHolder;
+import jakarta.servlet.http.HttpServletRequest;  // 添加这一行
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
 
-@CrossOrigin
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -22,217 +27,123 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @Autowired
-    private TokenManageService tokenManageService;
+    private TokenService tokenService;
 
     @Autowired
-    private UserAuthService userAuthService;
+    private SysUserService sysUserService;
 
-    /**
-     * 登录接口 - 从数据库查询用户信息
-     */
     @PostMapping("/login")
-    public Result<LoginResponse> login(@RequestBody UserRequest userRequest, HttpServletRequest request) {
+    public Result<LoginResponse> login(@RequestBody UserRequest userRequest) {
         String username = userRequest.getUsername();
         String password = userRequest.getPassword();
 
         // 1. 从数据库查询用户
-        SysUser user = userAuthService.findByUsername(username);
-        if (user == null) {
-            return Result.fail(401, "用户名不存在");
+        SysUser sysUser = sysUserService.findSysUserByName(username);
+
+        // 2. 验证用户是否存在
+        if (sysUser == null) {
+            return Result.fail("用户名不存在");
         }
 
-        // 2. 验证密码
-        if (!userAuthService.verifyPassword(password, user.getPassword())) {
-            return Result.fail(401, "密码错误");
+        // 3. 验证密码
+        if (!password.equals(sysUser.getPassword())) {
+            return Result.fail("密码错误");
         }
 
-        // 3. 检查用户状态
-        if (user.getStatus() != 1) {
-            return Result.fail(403, "账号已被禁用，请联系管理员");
-        }
+        String tokenId = UUID.randomUUID().toString();
+        String userId = String.valueOf(sysUser.getId());
 
-        // 4. 从数据库查询角色和权限
-        List<String> roles = userAuthService.getUserRoles(user.getId());
-        List<String> permissions = userAuthService.getUserPermissions(user.getId());
+        // 4. 生成token
+        String token = jwtUtil.generateTokenByTokenId(userId, tokenId);
 
-        // 5. 构建 LoginUser 对象
+        // 5. 把用户信息存入redis
         LoginUser loginUser = new LoginUser();
-        loginUser.setUserId(user.getId());
-        loginUser.setUsername(username);
-        loginUser.setRoles(roles);
-        loginUser.setPermissions(permissions);
-        loginUser.setLoginTime(System.currentTimeMillis());
-        loginUser.setTokenId(UUID.randomUUID().toString().replace("-", ""));
-        loginUser.setIpAddress(getClientIp(request));
-        loginUser.setDeviceInfo(request.getHeader("User-Agent"));
+        loginUser.setUsername(sysUser.getUsername());
+        loginUser.setUserid(userId);
+        loginUser.setTokenId(tokenId);
 
-        // 6. 生成 token
-        String token = jwtUtil.generateToken(loginUser);
-        loginUser.setToken(token);
+        tokenService.setLoginUser(userId, loginUser, tokenId);
 
-        // 7. 存储到 Redis
-        tokenManageService.storeLoginUser(loginUser, 24);
-
-        // 8. 返回响应（使用你现有的 LoginResponse）
+        // 6. 返回登录响应
         LoginResponse loginResponse = new LoginResponse();
-        loginResponse.setUsername(username);
+        loginResponse.setUsername(sysUser.getUsername());
         loginResponse.setToken(token);
-        loginResponse.setUserid(user.getId());
+        loginResponse.setUserid(userId);
 
         return Result.success(loginResponse);
     }
 
-    /**
-     * 退出登录
-     */
+    // 退出登录
     @PostMapping("/logout")
-    public Result<String> logout() {
-        LoginUser loginUser = UserContext.getLoginUser();
-
-        if (loginUser != null) {
-            tokenManageService.deleteToken(loginUser.getUserId(), loginUser.getTokenId());
-            UserContext.remove();
+    public Result<String> logout(HttpServletRequest request) {
+        String token = extractToken(request);
+        if (token != null) {
+            try {
+                String tokenId = jwtUtil.getTokenId(token);
+                String userId = jwtUtil.getUserId(token);
+                // 从Redis中删除该token
+                tokenService.removeToken(userId, tokenId);
+            } catch (Exception e) {
+                // token解析失败，忽略
+            }
         }
-        return Result.success("退出登录成功");
+        return Result.success("退出成功");
     }
 
-    /**
-     * 踢用户下线 - 需要管理员权限
-     */
-    @DeleteMapping("/kick/{userId}")
-    @RequirePermission("user:delete")
-    public Result<String> kickUser(@PathVariable String userId) {
-        LoginUser currentUser = UserContext.getLoginUser();
-
-        if (currentUser.getUserId().equals(userId)) {
-            return Result.fail(400, "不能踢自己");
-        }
-
-        tokenManageService.deleteAllUserTokens(userId);
-        return Result.success("用户已踢下线");
-    }
-
-    /**
-     * 踢用户指定设备下线 - 需要管理员权限
-     */
-    @DeleteMapping("/kick/{userId}/{tokenId}")
-    @RequirePermission("token:manage")
-    public Result<String> kickUserDevice(@PathVariable String userId, @PathVariable String tokenId) {
-        tokenManageService.deleteToken(userId, tokenId);
-        return Result.success("用户设备已踢下线");
-    }
-
-    /**
-     * 用户强制下线自己（只踢当前设备）
-     */
+    // 踢自己下线
     @DeleteMapping("/kick-self")
-    public Result<String> kickSelf() {
-        LoginUser loginUser = UserContext.getLoginUser();
-
-        if (loginUser != null) {
-            tokenManageService.deleteToken(loginUser.getUserId(), loginUser.getTokenId());
-            UserContext.remove();
+    public Result<String> kickSelf(HttpServletRequest request) {
+        String token = extractToken(request);
+        if (token != null) {
+            try {
+                String tokenId = jwtUtil.getTokenId(token);
+                String userId = jwtUtil.getUserId(token);
+                // 删除自己所有的token
+                tokenService.removeAllUserTokens(userId);
+            } catch (Exception e) {
+                // token解析失败，忽略
+            }
         }
-
         return Result.success("已强制下线");
     }
 
-    /**
-     * 获取当前用户信息
-     */
+    // 获取当前用户信息
     @GetMapping("/current-user")
     public Result<Map<String, Object>> getCurrentUser() {
-        LoginUser loginUser = UserContext.getLoginUser();
-
+        LoginUser loginUser = UserContextHolder.getUser();
         if (loginUser == null) {
             return Result.fail(401, "未登录");
         }
 
         Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("userId", loginUser.getUserId());
+        userInfo.put("userId", loginUser.getUserid());
         userInfo.put("username", loginUser.getUsername());
-        userInfo.put("roles", loginUser.getRoles());
-        userInfo.put("permissions", loginUser.getPermissions());
 
         return Result.success(userInfo);
     }
 
-    /**
-     * 获取所有在线用户 - 需要管理员权限
-     */
+    // 获取所有在线用户（需要管理员权限，这里先放开）
     @GetMapping("/online-users")
-    @RequireRole("admin")
-    public Result<Map<String, Set<Object>>> getOnlineUsers() {
-        Map<String, Set<Object>> onlineUsers = tokenManageService.getAllOnlineUsers();
-        return Result.success(onlineUsers);
+    public Result<Map<String, Set<String>>> getOnlineUsers() {
+        Map<String, Set<String>> allOnlineUsers = tokenService.getAllOnlineUsers();
+        return Result.success(allOnlineUsers);
     }
 
-    /**
-     * 获取用户的所有在线设备
-     */
-    @GetMapping("/my-devices")
-    public Result<Map<String, Object>> getMyDevices() {
-        LoginUser loginUser = UserContext.getLoginUser();
-
-        Set<Object> tokenIds = tokenManageService.getUserTokenIds(loginUser.getUserId());
-        List<Map<String, Object>> devices = new ArrayList<>();
-
-        for (Object tokenIdObj : tokenIds) {
-            String tokenId = tokenIdObj.toString();
-            Map<String, Object> device = new HashMap<>();
-            device.put("tokenId", tokenId);
-            device.put("remainingTTL", tokenManageService.getTokenRemainingTTL(loginUser.getUserId(), tokenId));
-
-            if (tokenId.equals(loginUser.getTokenId())) {
-                device.put("isCurrent", true);
-            }
-            devices.add(device);
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("devices", devices);
-        result.put("count", devices.size());
-
-        return Result.success(result);
+    // 踢用户下线
+    @DeleteMapping("/kick/{userId}")
+    public Result<String> kickUser(@PathVariable String userId, HttpServletRequest request) {
+        // 这里可以添加权限验证，比如只有管理员才能踢人
+        // 简单起见，直接踢人
+        tokenService.removeAllUserTokens(userId);
+        return Result.success("用户 " + userId + " 已被踢下线");
     }
 
-    /**
-     * 删除指定设备（用户自己操作）
-     */
-    @DeleteMapping("/delete-device/{tokenId}")
-    public Result<String> deleteDevice(@PathVariable String tokenId) {
-        LoginUser loginUser = UserContext.getLoginUser();
-
-        if (tokenId.equals(loginUser.getTokenId())) {
-            return Result.fail(400, "不能删除当前登录的设备");
+    // 从请求头中提取token
+    private String extractToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
         }
-
-        Set<Object> userTokenIds = tokenManageService.getUserTokenIds(loginUser.getUserId());
-        if (userTokenIds.contains(tokenId)) {
-            tokenManageService.deleteToken(loginUser.getUserId(), tokenId);
-            return Result.success("设备已下线");
-        }
-
-        return Result.fail(400, "设备不存在或不属于当前用户");
-    }
-
-    /**
-     * 获取客户端IP
-     */
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
+        return null;
     }
 }

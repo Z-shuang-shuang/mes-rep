@@ -1,12 +1,13 @@
 package com.zjitc.framework.security.jwt;
 
-import com.zjitc.framework.security.context.UserContext;
-import com.zjitc.framework.security.service.TokenManageService;
+import com.zjitc.common.result.Result;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import tools.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 
 @Component
@@ -16,78 +17,91 @@ public class JwtInterceptor implements HandlerInterceptor {
     private JwtUtil jwtUtil;
 
     @Autowired
-    private TokenManageService tokenManageService;
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private TokenService tokenService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+
+        // 处理OPTIONS预检请求
         String method = request.getMethod();
         if (method.equals("OPTIONS")) {
             return true;
         }
 
-        String path = request.getRequestURI();
-        if (path.contains("/login") || path.contains("/register")) {
-            return true;
-        }
-
+        // 从请求头中获取token
         String authorization = request.getHeader("Authorization");
-
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            writeUnauthorized(response, "认证失败");
+            writeUnauthorized(response, "认证失败：未提供token");
             return false;
         }
 
         try {
             String token = authorization.substring(7);
-            request.setAttribute("token", token);
 
-            // 1. 检查 token 是否过期
-            if (jwtUtil.isExp(token)) {
-                writeUnauthorized(response, "token已过期，请重新登录");
+            // 1. 检查token是否过期
+            boolean isExpired = jwtUtil.isExp(token);
+            if (isExpired) {
+                writeUnauthorized(response, "认证失败：token已过期");
                 return false;
             }
 
-            // 2. 解析 token 获取 userId 和 tokenId
+            // 2. 解析token，获取用户ID和tokenId
             String userId = jwtUtil.getUserId(token);
-            String tokenId = jwtUtil.getTokenIdFromToken(token);
+            String tokenId = jwtUtil.getTokenId(token);
 
-            // 3. 从 Redis 验证 token 是否存在
-            if (!tokenManageService.validateToken(userId, tokenId)) {
-                writeUnauthorized(response, "token已失效，请重新登录");
+            System.out.println("🔍 拦截器验证token - userId: " + userId + ", tokenId: " + tokenId);
+
+            // 3. 从Redis中检查token是否存在（关键！）
+            LoginUser loginUser = tokenService.getLoginUser(tokenId);
+            if (loginUser == null) {
+                System.out.println("❌ token在Redis中不存在，用户已被踢下线");
+                writeUnauthorized(response, "认证失败：用户已被踢下线或会话已过期");
                 return false;
             }
 
-            // 4. 获取 LoginUser 并存储到上下文
-            LoginUser loginUser = tokenManageService.getLoginUser(userId, tokenId);
-            if (loginUser == null) {
-                // 降级方案：从 token 解析
-                loginUser = jwtUtil.parseTokenToLoginUser(token);
+            // 4. 验证token中的userId是否与Redis中的一致
+            if (!userId.equals(loginUser.getUserid())) {
+                System.out.println("❌ userId不匹配: token中=" + userId + ", Redis中=" + loginUser.getUserid());
+                writeUnauthorized(response, "认证失败：用户信息不匹配");
+                return false;
             }
 
-            if (loginUser != null) {
-                loginUser.setToken(token);
-                UserContext.setLoginUser(loginUser);
-            } else {
-                UserContext.setUserId(userId);
-                UserContext.setToken(token);
-            }
+            System.out.println("✅ token验证通过，用户: " + loginUser.getUsername());
+
+            // 5. 将用户信息存储到ThreadLocal中
+            UserContextHolder.setUser(loginUser);
+            request.setAttribute("userId", userId);
+            request.setAttribute("username", loginUser.getUsername());
 
             return true;
+
         } catch (Exception e) {
-            writeUnauthorized(response, "认证失败: " + e.getMessage());
+            System.err.println("❌ token验证异常: " + e.getMessage());
+            e.printStackTrace();
+            writeUnauthorized(response, "认证失败：" + e.getMessage());
             return false;
         }
     }
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
-        UserContext.remove();
+        // 清理ThreadLocal，防止内存泄漏
+        UserContextHolder.clear();
     }
 
     private void writeUnauthorized(HttpServletResponse response, String msg) throws IOException {
-        String json = String.format("{\"code\":401,\"message\":\"%s\",\"data\":null}", msg);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
-        response.setStatus(401);
-        response.getWriter().write(json);
+        response.setCharacterEncoding("UTF-8");
+
+        Result<String> result = Result.fail(401, msg);
+        String jsonResult = objectMapper.writeValueAsString(result);
+        response.getWriter().write(jsonResult);
+        response.getWriter().flush();
+
+        System.out.println("🔒 返回401未授权: " + msg);
     }
 }
