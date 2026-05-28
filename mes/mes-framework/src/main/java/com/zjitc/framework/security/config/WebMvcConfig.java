@@ -1,8 +1,10 @@
-package com.zjitc.framework.security.config; // 建议放在 config 包下
+package com.zjitc.framework.security.config;
 
+import com.zjitc.framework.security.interceptor.PermissionInterceptor;
 import com.zjitc.framework.security.jwt.JwtInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -12,18 +14,28 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private JwtInterceptor jwtInterceptor;
 
+    @Autowired
+    private PermissionInterceptor permissionInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 拦截器执行顺序：先添加的先执行
+        // 1. JWT拦截器（先验证token是否有效）
         registry.addInterceptor(jwtInterceptor)
-                // 1. 指定拦截的路径：通常拦截所有需要鉴权的接口
                 .addPathPatterns("/api/**")
-                // 2. 指定放行的路径：登录、注册、静态资源等不需要 Token 的接口
                 .excludePathPatterns(
                         "/api/**/login",      // 登录接口
-                        "/api/**/register"  // 注册接口
-                                              // 如果有 swagger/knife4j 文档
-                                              // 静态资源
-                                              // 图标
-                );
+                        "/api/**/register"    // 注册接口
+                )
+                .order(1);  // 优先级1，先执行
+
+        // 2. 权限拦截器（验证token后，检查角色/权限）
+        registry.addInterceptor(permissionInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/**/login",
+                        "/api/**/register"
+                )
+                .order(2);  // 优先级2，后执行
     }
 }
