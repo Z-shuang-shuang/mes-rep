@@ -1,101 +1,56 @@
-<script lang="ts" setup>
-import router from '@/router';
-import axios from 'axios';
-import {ref} from 'vue'
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 
-let username = ref("")
-let password = ref("")
-let loading = ref(false)
+const router = useRouter()
+const username = ref('')
+const password = ref('')
+const loading = ref(false)
 
-// 添加axios响应拦截器（全局处理token失效）
-axios.interceptors.response.use(
-  response => {
-    // 正常响应直接返回
-    return response
-  },
-  error => {
-    // 处理错误响应
-    if (error.response) {
-      // 如果是401未授权（token过期或被踢下线）
-      if (error.response.status === 401) {
-        // 清除本地token
-        localStorage.removeItem('token')
-        // 跳转到登录页
-        router.push('/')
-        // 提示用户
-        alert('登录已过期，请重新登录')
-      }
-    }
-    return Promise.reject(error)
-  }
-)
-
-// 添加axios请求拦截器（自动添加token）
-axios.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
-
-function submit(): void {
-  if (loading.value) return;
-  loading.value = true;
-
-  axios.post("http://localhost:8080/api/v1/auth/login", {
-    username: username.value,
-    password: password.value
-  }).then(res => {
-    console.log(res.data)
+const login = async () => {
+  if (loading.value) return
+  loading.value = true
+  
+  try {
+    const res = await axios.post('/api/v1/auth/login', {
+      username: username.value,
+      password: password.value
+    })
+    
     if (res.data.code === 200) {
-      localStorage.setItem("token", res.data.data.token)
-      router.push({name: "Index"})
+      localStorage.setItem('token', res.data.data.token)
+      router.push('/index')
     } else {
       alert(res.data.msg || '登录失败')
     }
-  }).catch(err => {
-    alert('登录失败：' + (err.response?.data?.msg || '网络错误'))
-  }).finally(() => {
-    loading.value = false;
-  })
+  } catch (err: any) {
+    alert(err.response?.data?.msg || '登录失败')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <template>
-  <form @submit.prevent="submit" style="max-width: 300px; margin: 50px auto;">
-    <div style="margin-bottom: 10px;">
-      <input v-model="username" placeholder="请输入用户名" style="width: 100%; padding: 8px;" />
-    </div>
-    <div style="margin-bottom: 10px;">
-      <input v-model="password" type="password" placeholder="请输入密码" style="width: 100%; padding: 8px;" />
-    </div>
-    <div>
-      <button type="submit" :disabled="loading" style="padding: 8px 16px; margin-right: 10px;">
-        {{ loading ? "登录中..." : "提交" }}
+  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
+    <form @submit.prevent="login" style="background: white; padding: 30px; border-radius: 8px; width: 300px;">
+      <h2 style="text-align: center; margin-bottom: 20px;">登录</h2>
+      <input 
+        v-model="username" 
+        type="text" 
+        placeholder="用户名" 
+        style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;"
+      />
+      <input 
+        v-model="password" 
+        type="password" 
+        placeholder="密码" 
+        style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px;"
+      />
+      <button type="submit" :disabled="loading" style="width: 100%; padding: 10px; background: #409eff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        {{ loading ? '登录中...' : '登录' }}
       </button>
-      <button type="reset" style="padding: 8px 16px;">重置</button>
-    </div>
-  </form>
+    </form>
+  </div>
 </template>
-
-<style scoped>
-input {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>
