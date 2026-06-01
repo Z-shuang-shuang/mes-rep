@@ -7,8 +7,10 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="mes-common" />
+        <module name="mes-system" />
+        <module name="mes-work-order" />
         <module name="mes-admin" />
+        <module name="mes-common" />
         <module name="mes-framework" />
       </profile>
     </annotationProcessing>
@@ -18,6 +20,8 @@
       <module name="mes-admin" options="-parameters" />
       <module name="mes-common" options="-parameters" />
       <module name="mes-framework" options="-parameters" />
+      <module name="mes-system" options="-parameters" />
+      <module name="mes-work-order" options="-parameters" />
     </option>
   </component>
 </project>

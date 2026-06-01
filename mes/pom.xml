@@ -25,6 +25,8 @@
         <module>mes-admin</module>
         <module>mes-common</module>
         <module>mes-framework</module>
+        <module>mes-system</module>
+        <module>mes-work-order</module>
     </modules>
     <scm>
         <connection/>

@@ -4,6 +4,9 @@
     <file url="file://$PROJECT_DIR$/mes/mes-admin/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mes/mes-common/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mes/mes-framework/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/mes/mes-system/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/mes/mes-system/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/mes/mes-work-order/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mes/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/mes/src/main/resources" charset="UTF-8" />
   </component>
