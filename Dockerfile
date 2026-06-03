@@ -12,11 +12,11 @@ RUN mkdir -p /root/.m2 && \
 COPY mes/ ./
 RUN mvn clean package -Dmaven.test.skip=true
 
-FROM nginx:stable
-RUN apt-get update && apt-get install -y openjdk-17-jre && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:17-jre
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 COPY --from=backend-build /app/backend/mes-admin/target/*.jar /app/backend/app.jar
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 EXPOSE 80 8080
