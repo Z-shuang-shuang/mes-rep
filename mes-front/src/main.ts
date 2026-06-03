@@ -3,7 +3,7 @@ import App from './App.vue'
 import router from './router'
 import axios from 'axios'
 
-axios.defaults.baseURL = 'http://47.100.25.50:8083'
+axios.defaults.baseURL = '/api'
 
 // 请求拦截器：自动添加token
 axios.interceptors.request.use(config => {
