@@ -119,6 +119,10 @@ CREATE TABLE `sys_user_role` (
 insert  into `sys_user_role`(`id`,`user_id`,`role_id`) values 
 (1,1,1);
 
+-- 在文件末尾加上
+INSERT INTO `sys_user` (`id`, `username`, `password`, `status`) VALUES
+    (1, 'yyy', '123456', 1);
+
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
