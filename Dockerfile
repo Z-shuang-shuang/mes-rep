@@ -12,8 +12,8 @@ RUN mkdir -p /root/.m2 && \
 COPY mes/ ./
 RUN mvn clean package -Dmaven.test.skip=true
 
-FROM nginx:alpine
-RUN apk add --no-cache openjdk17-jre
+FROM eclipse-temurin:17-jre
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
 COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 COPY --from=backend-build /app/backend/mes-admin/target/*.jar /app/backend/app.jar
 COPY start.sh /start.sh
