@@ -1,4 +1,6 @@
 spring:
+  main:
+    allow-circular-references: true
   datasource:
     url: jdbc:mysql://mysql:3306/mes?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8
     username: root
@@ -12,8 +14,10 @@ spring:
       database: 0
       timeout: 5000ms
 
-# MyBatis 配置
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+server:
+  port: 8080
