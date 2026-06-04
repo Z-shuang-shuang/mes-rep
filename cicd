@@ -47,3 +47,6 @@ docker push crpi-8w4iw1g4vwye5tsl.cn-shanghai.personal.cr.aliyuncs.com/mes-rep/m
 Watchtower 自动拉取更新，只需再执行 nginx 修复：
 
 docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s reload"
+
+
+http://47.100.25.50:8081/login
