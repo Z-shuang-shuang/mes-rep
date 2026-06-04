@@ -1,0 +1,4 @@
+如果重建容器，修复 nginx 命令
+docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s reload"
+
+
