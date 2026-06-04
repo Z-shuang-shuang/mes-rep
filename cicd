@@ -50,4 +50,5 @@ docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s re
 
 改代码 → git push → 双击 deploy.bat → 等30秒 → 一行命令修复 nginx → 更新完成！
 ssh root@47.100.25.50
+
 http://47.100.25.50:8081/login
