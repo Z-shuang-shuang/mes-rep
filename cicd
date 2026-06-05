@@ -55,3 +55,20 @@ http://47.100.25.50:8081/login
 
 测试登录，查 Origin：
 docker logs mes-app 2>&1 | grep -E "请求信息|Origin:" | tail -5
+
+每次deploy.bat之后，在服务器执行：
+docker stop mes-app && docker rm mes-app
+
+docker run -d --name mes-app --network app-net -p 8081:80 -p 8083:8080 --restart=always \
+  --memory=400m \
+  -e JAVA_TOOL_OPTIONS="-Xmx200m -Xms64m" \
+  -e SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/mes?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&allowPublicKeyRetrieval=true" \
+  -e SPRING_DATASOURCE_USERNAME=root \
+  -e SPRING_DATASOURCE_PASSWORD=123456 \
+  -e SPRING_DATA_REDIS_HOST=redis \
+  -e SPRING_DATA_REDIS_PORT=6379 \
+  --entrypoint "" \
+  crpi-8w4iw1g4vwye5tsl.cn-shanghai.personal.cr.aliyuncs.com/mes-rep/mes-app:v1.0 \
+  /bin/sh -c "nginx; java -jar /app/backend/app.jar --server.port=8080"
+
+docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s reload"
