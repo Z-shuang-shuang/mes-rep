@@ -52,3 +52,6 @@ docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s re
 ssh root@47.100.25.50
 
 http://47.100.25.50:8081/login
+
+测试登录，查 Origin：
+docker logs mes-app 2>&1 | grep -E "请求信息|Origin:" | tail -5
