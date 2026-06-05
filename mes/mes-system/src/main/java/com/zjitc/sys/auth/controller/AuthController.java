@@ -35,7 +35,12 @@ public class AuthController {
     private SysUserService sysUserService;
 
     @PostMapping("/login")
-    public Result<LoginResponse> login(@RequestBody UserRequest userRequest) {
+    public Result<LoginResponse> login(@RequestBody UserRequest userRequest,HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        System.out.println("========== 请求信息 ==========");
+        System.out.println("Origin: " + origin);
+        System.out.println("请求来源: " + request.getRemoteHost() + ":" + request.getRemotePort());
+
         String username = userRequest.getUsername();
         String password = userRequest.getPassword();
 

@@ -13,6 +13,10 @@ const login = async () => {
   loading.value = true
   
   try {
+
+    console.log('当前页面URL:', window.location.href)
+    console.log('当前端口:', window.location.port)
+    
     const res = await axios.post('/api/v1/auth/login', {
       username: username.value,
       password: password.value
