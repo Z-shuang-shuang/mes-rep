@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import request from '@/utils/request'  // 改这里：引入封装好的实例
 
 const user = ref({ username: '', userId: '' })
 
 onMounted(async () => {
   try {
-    const res = await axios.get('/api/v1/auth/current-user')
-    if (res.data.code === 200) {
-      user.value = res.data.data
+    const res = await request.get('/v1/auth/current-user')
+    if (res.code === 200) {
+      user.value = res.data
     }
   } catch (e) {
     console.error(e)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import request from '@/utils/request'  // 改这里：引入封装好的实例
 
 const router = useRouter()
 const username = ref('')
@@ -13,23 +13,19 @@ const login = async () => {
   loading.value = true
   
   try {
-
-    console.log('当前页面URL:', window.location.href)
-    console.log('当前端口:', window.location.port)
-    
-    const res = await axios.post('/api/v1/auth/login', {
+    // 用法不变，但会自动携带 token 和统一处理错误
+    const res = await request.post('/v1/auth/login', {
       username: username.value,
       password: password.value
     })
     
-    if (res.data.code === 200) {
-      localStorage.setItem('token', res.data.data.token)
+    if (res.code === 200) {
+      localStorage.setItem('token', res.data.token)
       router.push('/index')
-    } else {
-      alert(res.data.msg || '登录失败')
     }
   } catch (err: any) {
-    alert(err.response?.data?.msg || '登录失败')
+    // 错误已在拦截器处理，这里可以什么都不写或者只记录日志
+    console.error('登录失败:', err)
   } finally {
     loading.value = false
   }
