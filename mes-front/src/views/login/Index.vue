@@ -1,9 +1,13 @@
+<!-- 登录组件 -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import request from '@/utils/request'  // 改这里：引入封装好的实例
+import { http } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const userStore = useUserStore()
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
@@ -13,24 +17,31 @@ const login = async () => {
   loading.value = true
   
   try {
-    // 用法不变，但会自动携带 token 和统一处理错误
-    const res = await request.post('/v1/auth/login', {
+    const res = await http.post('/v1/auth/login', {
       username: username.value,
       password: password.value
+    }, {
+      showLoading: true,  // 可以显示全局 loading
+      errorMessage: '登录失败，请检查用户名和密码'
     })
     
-    if (res.code === 200) {
-      localStorage.setItem('token', res.data.token)
-      router.push('/index')
-    }
+    // 保存 token
+    userStore.setToken(res.data.token)
+    
+    // 获取用户信息
+    await userStore.getUserInfo()
+    
+    ElMessage.success('登录成功')
+    router.push('/index')
   } catch (err: any) {
-    // 错误已在拦截器处理，这里可以什么都不写或者只记录日志
+    // 错误已在拦截器处理
     console.error('登录失败:', err)
   } finally {
     loading.value = false
   }
 }
 </script>
+
 
 <template>
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">

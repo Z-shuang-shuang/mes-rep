@@ -1,15 +1,17 @@
+<!-- 首页组件 -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import request from '@/utils/request'  // 改这里：引入封装好的实例
+import { http } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const user = ref({ username: '', userId: '' })
 
 onMounted(async () => {
   try {
-    const res = await request.get('/v1/auth/current-user')
-    if (res.code === 200) {
-      user.value = res.data
-    }
+    // 使用新的 http 实例
+    const res = await http.get('/v1/auth/current-user')
+    user.value = res.data
   } catch (e) {
     console.error(e)
   }
