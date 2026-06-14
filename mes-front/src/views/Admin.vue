@@ -1,7 +1,6 @@
-<!-- 用户管理组件（更新为使用新封装） -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { http } from '@/utils/request'
+import { getOnlineUsersApi, kickUserApi } from '@/api'  // ← 关键：从 api 导入
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const users = ref<any[]>([])
@@ -10,14 +9,13 @@ const loading = ref(false)
 const getUsers = async () => {
   loading.value = true
   try {
-    const res = await http.get('/v1/auth/online-users')
+    const res = await getOnlineUsersApi()  // ← 关键：调用 API
     const data = res.data
     users.value = Object.keys(data).map(id => ({
       id,
       tokenCount: data[id].length
     }))
   } catch (err: any) {
-    // 错误已统一处理
     console.error('获取用户列表失败', err)
   } finally {
     loading.value = false
@@ -32,7 +30,7 @@ const kick = async (userId: string) => {
       type: 'warning'
     })
     
-    await http.delete(`/v1/auth/kick/${userId}`)
+    await kickUserApi(userId)  // ← 关键：调用 API
     ElMessage.success('已踢下线')
     getUsers()
   } catch (err: any) {

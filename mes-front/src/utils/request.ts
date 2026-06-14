@@ -3,6 +3,7 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import router from '@/router'
+import type { AxiosRequestConfig } from 'axios'
 
 // 定义响应数据结构
 export interface ResponseData<T = any> {

@@ -1,28 +1,27 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
-// 菜单配置
 const menus = [
   { path: '/index', name: '首页' },
   { path: '/user', name: '用户管理' },
   { path: '/admin', name: '在线用户' }
 ]
 
-// 跳转
 const goTo = (path: string) => {
   router.push(path)
 }
 
-// 退出登录
+// ✅ 使用 store 的 logout 方法
 const logout = () => {
-  localStorage.removeItem('token')
+  userStore.logout()  // store 里会清理 token 和 userInfo
   router.push('/login')
 }
 </script>
-
 <template>
   <div style="display: flex; height: 100vh;">
     <!-- 左侧菜单 -->

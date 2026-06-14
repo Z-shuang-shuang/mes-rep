@@ -1,6 +1,6 @@
 // stores/user.ts
 import { defineStore } from 'pinia'
-import { http } from '@/utils/request'
+import { getCurrentUserApi } from '@/api'  // ✅ 引入 API
 
 interface UserState {
   token: string | null
@@ -26,7 +26,8 @@ export const useUserStore = defineStore('user', {
     
     async getUserInfo() {
       try {
-        const res = await http.get('/v1/auth/current-user')
+        // ✅ 使用封装好的 API
+        const res = await getCurrentUserApi()
         this.userInfo = res.data
         return res.data
       } catch (error) {
