@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getOnlineUsersApi, kickUserApi } from '@/api'  // ← 关键：从 api 导入
+import { getOnlineUsersApi, kickUserApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-const users = ref<any[]>([])
+const users = ref<Array<{ id: string; tokenCount: number }>>([])
 const loading = ref(false)
 
 const getUsers = async () => {
   loading.value = true
   try {
-    const res = await getOnlineUsersApi()  // ← 关键：调用 API
+    const res = await getOnlineUsersApi()
     const data = res.data
     users.value = Object.keys(data).map(id => ({
       id,
       tokenCount: data[id].length
     }))
-  } catch (err: any) {
+  } catch (err) {
     console.error('获取用户列表失败', err)
   } finally {
     loading.value = false
@@ -30,10 +30,10 @@ const kick = async (userId: string) => {
       type: 'warning'
     })
     
-    await kickUserApi(userId)  // ← 关键：调用 API
+    await kickUserApi(userId)
     ElMessage.success('已踢下线')
     getUsers()
-  } catch (err: any) {
+  } catch (err) {
     if (err !== 'cancel') {
       console.error('操作失败', err)
     }
@@ -56,8 +56,8 @@ onMounted(() => {
       <el-table-column prop="id" label="用户ID" />
       <el-table-column prop="tokenCount" label="在线设备数" />
       <el-table-column label="操作">
-        <template #default="{ row }">
-          <el-button type="danger" size="small" @click="kick(row.id)">
+        <template #default="scope">
+          <el-button type="danger" size="small" @click="kick(scope.row.id)">
             踢下线
           </el-button>
         </template>

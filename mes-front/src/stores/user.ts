@@ -1,6 +1,6 @@
 // stores/user.ts
+import { getCurrentUserApi } from '@/api'
 import { defineStore } from 'pinia'
-import { getCurrentUserApi } from '@/api'  // ✅ 引入 API
 
 interface UserState {
   token: string | null

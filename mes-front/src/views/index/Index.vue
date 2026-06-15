@@ -1,4 +1,3 @@
-<!-- views/index/Index.vue -->
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
@@ -8,7 +7,6 @@ const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
 
 onMounted(async () => {
-  // 如果 store 中没有用户信息，则获取
   if (!userInfo.value) {
     await userStore.getUserInfo()
   }

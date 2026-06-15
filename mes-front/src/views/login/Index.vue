@@ -1,8 +1,9 @@
+<!-- views/login/Index.vue -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { loginApi, getCurrentUserApi } from '@/api'  // ✅ 从 api 层导入
+import { loginApi, getCurrentUserApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -16,16 +17,13 @@ const login = async () => {
   loading.value = true
   
   try {
-    // ✅ 调用封装好的 API，不直接写路径
     const res = await loginApi({
       username: username.value,
       password: password.value
     })
     
-    // 保存 token
     userStore.setToken(res.data.token)
     
-    // 获取用户信息（也可以封装到 store 里）
     const userRes = await getCurrentUserApi()
     userStore.userInfo = userRes.data
     
@@ -38,3 +36,26 @@ const login = async () => {
   }
 }
 </script>
+
+<template>
+  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
+    <form @submit.prevent="login" style="background: white; padding: 30px; border-radius: 8px; width: 300px;">
+      <h2 style="text-align: center; margin-bottom: 20px;">登录</h2>
+      <input 
+        v-model="username" 
+        type="text" 
+        placeholder="用户名" 
+        style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;"
+      />
+      <input 
+        v-model="password" 
+        type="password" 
+        placeholder="密码" 
+        style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px;"
+      />
+      <button type="submit" :disabled="loading" style="width: 100%; padding: 10px; background: #409eff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        {{ loading ? '登录中...' : '登录' }}
+      </button>
+    </form>
+  </div>
+</template>
