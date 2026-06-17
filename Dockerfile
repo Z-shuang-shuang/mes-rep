@@ -1,9 +1,9 @@
 FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY mes-front/package*.json ./
-RUN npm install
+RUN npm config set registry https://registry.npmmirror.com && npm install
 COPY mes-front/ ./
-RUN npm run build
+RUN npx vite build
 
 FROM maven:3-eclipse-temurin-17 AS backend-build
 WORKDIR /app/backend
