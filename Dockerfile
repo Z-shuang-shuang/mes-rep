@@ -19,5 +19,12 @@ COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 COPY --from=backend-build /app/backend/mes-admin/target/*.jar /app/backend/app.jar
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+
+# 删除默认 Nginx 配置
+RUN rm -f /etc/nginx/conf.d/default.conf /etc/nginx/sites-enabled/default
+
+# 复制自定义 Nginx 配置（确保覆盖）
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80 8080
 CMD ["/start.sh"]
