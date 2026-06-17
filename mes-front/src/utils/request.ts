@@ -30,7 +30,7 @@ const defaultOptions: RequestOptions = {
 
 // 创建 axios 实例
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://47.100.25.50:8083/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://47.100.25.50:8080/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
