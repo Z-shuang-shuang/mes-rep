@@ -38,7 +38,7 @@ const login = async () => {
 </script>
 
 <template>
-  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5;">
+  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #8903f6;">
     <form @submit.prevent="login" style="background: white; padding: 30px; border-radius: 8px; width: 300px;">
       <h2 style="text-align: center; margin-bottom: 20px;">登录</h2>
       <input 
@@ -60,8 +60,5 @@ const login = async () => {
   </div>
 </template>
 <style scoped> 
-div{
-  background: #debef8;
-  min-height: 100vh;
-}
+
 </style>
