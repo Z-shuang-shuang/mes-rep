@@ -72,3 +72,9 @@ docker run -d --name mes-app --network app-net -p 8081:80 -p 8083:8080 --restart
   /bin/sh -c "nginx; java -jar /app/backend/app.jar --server.port=8080"
 
 docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s reload"
+
+
+
+GitHub推送
+git remote set-url origin git@github.com:Z-shuang-shuang/mes-rep.git
+git push origin master
