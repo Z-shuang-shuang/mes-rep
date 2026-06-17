@@ -78,3 +78,8 @@ docker exec mes-app sh -c "rm -f /etc/nginx/sites-enabled/default && nginx -s re
 GitHub推送
 git remote set-url origin git@github.com:Z-shuang-shuang/mes-rep.git
 git push origin master
+
+
+
+GitHub的地址
+https://github.com/Z-shuang-shuang/mes-rep.git
