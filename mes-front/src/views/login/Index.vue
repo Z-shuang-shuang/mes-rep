@@ -59,3 +59,9 @@ const login = async () => {
     </form>
   </div>
 </template>
+<style scoped> 
+div{
+  background: #debef8;
+  min-height: 100vh;
+}
+</style>
